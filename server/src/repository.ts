@@ -4,6 +4,7 @@ export interface User {
   name: string;
   email: string;
   pass: string;
+  salt: string;
 }
 
 export enum AnswerKind {

@@ -1,5 +1,14 @@
 import http = require("http");
+import crypto = require("crypto");
 import { repository, User } from "./repository";
+
+function generateSalt(): string {
+  return crypto.randomBytes(16).toString("hex");
+}
+
+function processPassword(pass: string, salt: string): string {
+  return crypto.createHash("sha256").update(salt + pass + "somecleverpepper").digest("hex");
+}
 
 type Handler = (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => void
 const endpoints: Map<string, Map<string, Handler>> = new Map()
@@ -19,17 +28,44 @@ function handleMessageData(req: http.IncomingMessage, url: URL, res: http.Server
   });
 }
 
+addHandler("/login", "POST", (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => {
+  handleMessageData(req, url, res, (_req: http.IncomingMessage, _url: URL, data: string, res: http.ServerResponse) => {
+    const jsonData = JSON.parse(data);
+    const user: User | null = repository.fetchUser(jsonData.name);
+    if (user === null) {
+      res.writeHead(404);
+      res.end();
+      return;
+    }
+    const attemptedPass: string = processPassword(jsonData.pass, user.salt);
+    if (attemptedPass != user.pass) {
+      res.writeHead(403);
+      res.end();
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ session: repository.createSession(user) }));
+  })
+});
+
 addHandler("/register", "POST", (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => {
-  handleMessageData(req, url, res, (req: http.IncomingMessage, url: URL, data: string, res: http.ServerResponse) => {
-    const jsonData: User = JSON.parse(data);
+  handleMessageData(req, url, res, (_req: http.IncomingMessage, _url: URL, data: string, res: http.ServerResponse) => {
+    const jsonData = JSON.parse(data);
     if (repository.fetchUser(jsonData.name) !== null) {
       res.writeHead(400);
       res.end();
       return;
     }
-    repository.uploadUser(jsonData);
+    const salt: string = generateSalt();
+    const user: User = {
+      name: jsonData.name,
+      email: jsonData.email,
+      salt: salt,
+      pass: processPassword(jsonData.pass, salt),
+    }
+    repository.uploadUser(user);
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ session: repository.createSession(jsonData) }));
+    res.end(JSON.stringify({ session: repository.createSession(user) }));
   })
 });
 
