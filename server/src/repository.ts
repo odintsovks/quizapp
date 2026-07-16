@@ -1,46 +1,46 @@
 import crypto = require("crypto")
 
-interface User {
+export interface User {
   name: string;
   email: string;
   pass: string;
 }
 
-enum AnswerKind {
+export enum AnswerKind {
   Radio,
   Checkbox,
   TextEdit
 }
 
-interface RadioAnswer {
+export interface RadioAnswer {
   options: string[];
   correctAnswer: number;
 }
 
-interface CheckboxAnswer {
+export interface CheckboxAnswer {
   options: string[];
   correctAnswers: number[];
 }
 
-interface TextEditAnswer {
+export interface TextEditAnswer {
   correctAnswers: string[];
 }
 
-interface QuizQuestion {
+export interface QuizQuestion {
   weight: number;
   question: string;
   kind: AnswerKind;
   answer: RadioAnswer | CheckboxAnswer | TextEditAnswer;
 }
 
-interface Quiz {
+export interface Quiz {
   uid: string;
   author: string;
   title: string;
   question: QuizQuestion[];
 }
 
-interface Repository {
+export interface Repository {
   fetchUser(name: string): User | null;
   uploadUser(user: User): void;
   fetchUserBySession(token: string): User | null;
@@ -80,6 +80,4 @@ class MapRepository implements Repository {
   }
 }
 
-module.exports = {
-  repository: new MapRepository()
-}
+export const repository: Repository = new MapRepository()
