@@ -1,6 +1,6 @@
 import http = require("http");
 import crypto = require("crypto");
-import { repository, User } from "./repository";
+import { repository, User, Quiz, QuizQuestion, AnswerKind, RadioAnswer, CheckboxAnswer } from "./repository";
 
 function generateSalt(): string {
   return crypto.randomBytes(16).toString("hex");
@@ -27,6 +27,43 @@ function handleMessageData(req: http.IncomingMessage, url: URL, res: http.Server
     handler.call(null, req, url, data, res);
   });
 }
+
+function stripAnswers(questions: QuizQuestion[]): Object[] {
+  var result: Object[] = [];
+  for (const q of questions) {
+    switch (q.kind) {
+      case AnswerKind.Radio:
+        result.push({ question: q.question, weight: q.weight, kind: q.kind, options: (q.answer as RadioAnswer).options })
+        break;
+      case AnswerKind.Checkbox:
+        result.push({ question: q.question, weight: q.weight, kind: q.kind, options: (q.answer as CheckboxAnswer).options })
+        break;
+      case AnswerKind.TextEdit:
+        result.push({ question: q.question, weight: q.weight, kind: q.kind })
+        break;
+    }
+  }
+  return result;
+}
+
+addHandler("/quiz", "GET", (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => {
+  const searchParams: URLSearchParams = url.searchParams;
+  const id: string | null = searchParams.get("id");
+  if (id === null) {
+    res.writeHead(400);
+    res.end();
+    return;
+  }
+  res.writeHead(200, { "Content-Type": "application/json" });
+  const quiz: Quiz | null = repository.fetchQuiz(id);
+  if (quiz === null) {
+    res.writeHead(404);
+    res.end();
+    return;
+  }
+  res.writeHead(200);
+  res.end(JSON.stringify({ author: quiz.author, title: quiz.title, questions: stripAnswers(quiz.questions) }));
+});
 
 addHandler("/login", "POST", (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => {
   handleMessageData(req, url, res, (_req: http.IncomingMessage, _url: URL, data: string, res: http.ServerResponse) => {

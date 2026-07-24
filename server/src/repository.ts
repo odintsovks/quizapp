@@ -38,7 +38,7 @@ export interface Quiz {
   uid: string;
   author: string;
   title: string;
-  question: QuizQuestion[];
+  questions: QuizQuestion[];
 }
 
 export interface Repository {
