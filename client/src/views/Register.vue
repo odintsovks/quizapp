@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-const login = ref('login')
+const login = ref(sessionStorage.getItem("registerLogin") ?? 'login')
 const email = ref('email')
 const password = ref('password')
+sessionStorage.removeItem("registerLogin")
 </script>
 
 <template>
