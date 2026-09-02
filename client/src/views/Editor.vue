@@ -34,13 +34,12 @@
     questions: QuizQuestion[];
   }
 
-  const q: Quiz = {
+  const q = ref<Quiz>({
     uid: "",
     author: "",
     title: "",
-    questions: [
-    ],
-  };
+    questions: [],
+  });
 
   var currentQuestionIndex: number = 0;
   interface QuestionData {
@@ -60,7 +59,7 @@
   const saveQuestion = () => {
     if (data.value.weight === null || data.value.question === null || data.value.kind === null || data.value.answer === null)
       return;
-    q.questions[currentQuestionIndex] = {
+    q.value.questions[currentQuestionIndex] = {
       weight: data.value.weight,
       question: data.value.question,
       kind: data.value.kind,
@@ -69,23 +68,43 @@
   }
 
   const gotoQuestion = (index: number) => {
-    data.value.weight = q.questions.at(index)?.weight ?? null;
-    data.value.question = q.questions.at(index)?.question ?? null;
-    data.value.kind = q.questions.at(index)?.kind ?? null;
-    data.value.answer = q.questions.at(index)?.answer ?? null;
+    data.value.weight = q.value.questions.at(index)?.weight ?? null;
+    data.value.question = q.value.questions.at(index)?.question ?? null;
+    data.value.kind = q.value.questions.at(index)?.kind ?? null;
+    data.value.answer = q.value.questions.at(index)?.answer ?? null;
     currentQuestionIndex = index;
   }
 
   const addQuestion = () => {
+    q.value.questions.push(data.value);
     data.value.weight = null;
     data.value.question = null;
     data.value.kind = null;
     data.value.answer = null;
-    currentQuestionIndex = q.questions.length
+    currentQuestionIndex = q.value.questions.length
   }
 
   const setQuestionKind = (kind: AnswerKind) => {
     data.value.kind = kind;
+    switch (kind) {
+      case AnswerKind.Radio:
+        data.value.answer = {
+          options: [ "Answer" ],
+          correctAnswer: 0
+        };
+        return;
+      case AnswerKind.Checkbox:
+        data.value.answer = {
+          options: [ "Answer" ],
+          correctAnswers: [ 0 ]
+        };
+        return;
+      case AnswerKind.TextEdit:
+        data.value.answer = {
+          correctAnswers: [ "Answer" ]
+        };
+        return;
+    }
   }
 </script>
 
@@ -96,12 +115,18 @@
     <button @click="setQuestionKind(AnswerKind.TextEdit)">TextEdit</button>
   </div>
   <div v-if="data.kind === AnswerKind.Radio">
-    <input type="radio"><input/></input><button>-</button>
-    <button>+</button>
+    <div v-for="(o, i) in (data.answer as RadioAnswer).options">
+      <input type="radio">
+        <input :value="o" @input="event => (data.answer as RadioAnswer).options[i] = event.target.value" />
+      </input>
+      <button @click="event => (data.answer as RadioAnswer).options.splice(i, 1)">-</button>
+    </div>
+    <button @click="event => (data.answer as RadioAnswer).options.push('Answer')">+</button>
   </div>
   <button @click="saveQuestion">Save</button>
-  <div v-for="page in Array(q.questions.length).keys()">
-    <button @click="gotoQuestion(page)">{{page + 1}}</button>
+  <div v-for="(page, i) in q.questions">
+    {{i}}
+    <button @click="gotoQuestion(i)">{{i + 1}}</button>
   </div>
   <button @click="addQuestion">+</button>
 </template>
