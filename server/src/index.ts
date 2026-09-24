@@ -1,6 +1,6 @@
 import http = require("http");
 import crypto = require("crypto");
-import { repository, User, Quiz, QuizQuestion, AnswerKind, RadioAnswer, CheckboxAnswer } from "./repository";
+import { repository, User, Quiz, QuizQuestion, AnswerKind, RadioAnswer, CheckboxAnswer, TextEditAnswer } from "./repository";
 
 function generateSalt(): string {
   return crypto.randomBytes(16).toString("hex");
@@ -20,12 +20,28 @@ function addHandler(endpoint: string, method: string, handler: Handler): void {
   endpoints.get(endpoint)?.set(method, handler)
 }
 
-function handleMessageData(req: http.IncomingMessage, url: URL, res: http.ServerResponse, handler: (req: http.IncomingMessage, url: URL, data: string, res: http.ServerResponse) => void): void {
+function handleJsonBody(req: http.IncomingMessage, url: URL, res: http.ServerResponse, handler: (url: URL, body: any, res: http.ServerResponse) => void): void {
   let data: string = "";
   req.on("data", chunk => { data += chunk; });
   req.on("end", () => {
-    handler.call(null, req, url, data, res);
+    let body: any;
+    try {
+      body = JSON.parse(data);
+    } catch {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "invalid JSON body" }));
+      return;
+    }
+    handler.call(null, url, body, res);
   });
+}
+
+function fetchUserBySessionHeader(req: http.IncomingMessage): User | null {
+  const token = req.headers["x-session"];
+  if (typeof token !== "string") {
+    return null;
+  }
+  return repository.fetchUserBySession(token);
 }
 
 function stripAnswers(questions: QuizQuestion[]): Object[] {
@@ -46,38 +62,138 @@ function stripAnswers(questions: QuizQuestion[]): Object[] {
   return result;
 }
 
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(v => typeof v === "string");
+}
+
+function isValidQuestion(value: unknown): value is QuizQuestion {
+  if (typeof value !== "object" || value === null) return false;
+  const q = value as Record<string, unknown>;
+  if (typeof q.weight !== "number" || typeof q.question !== "string") return false;
+  const answer = q.answer as Record<string, unknown> | null;
+  if (answer === null || typeof answer !== "object") return false;
+  switch (q.kind) {
+    case AnswerKind.Radio:
+      return isStringArray(answer.options) && typeof answer.correctAnswer === "number";
+    case AnswerKind.Checkbox:
+      return isStringArray(answer.options) && Array.isArray(answer.correctAnswers) && answer.correctAnswers.every(v => typeof v === "number");
+    case AnswerKind.TextEdit:
+      return isStringArray(answer.correctAnswers);
+    default:
+      return false;
+  }
+}
+
+function gradeAnswer(question: QuizQuestion, given: unknown): boolean {
+  switch (question.kind) {
+    case AnswerKind.Radio:
+      return given === (question.answer as RadioAnswer).correctAnswer;
+    case AnswerKind.Checkbox: {
+      if (!Array.isArray(given) || !given.every(v => typeof v === "number")) return false;
+      const expected = [...(question.answer as CheckboxAnswer).correctAnswers].sort((a, b) => a - b);
+      const actual = (given as number[]).sort((a, b) => a - b);
+      return expected.length === actual.length && expected.every((v, i) => v === actual[i]);
+    }
+    case AnswerKind.TextEdit: {
+      if (typeof given !== "string") return false;
+      const normalized = given.trim().toLowerCase();
+      return (question.answer as TextEditAnswer).correctAnswers.some(a => a.trim().toLowerCase() === normalized);
+    }
+  }
+}
+
 addHandler("/quiz", "GET", (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => {
-  const searchParams: URLSearchParams = url.searchParams;
-  const id: string | null = searchParams.get("id");
+  const id: string | null = url.searchParams.get("id");
   if (id === null) {
     res.writeHead(400);
     res.end();
     return;
   }
-  res.writeHead(200, { "Content-Type": "application/json" });
   const quiz: Quiz | null = repository.fetchQuiz(id);
   if (quiz === null) {
     res.writeHead(404);
     res.end();
     return;
   }
-  res.writeHead(200);
+  res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ author: quiz.author, title: quiz.title, questions: stripAnswers(quiz.questions) }));
 });
 
-addHandler("/login", "POST", (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => {
-  handleMessageData(req, url, res, (_req: http.IncomingMessage, _url: URL, data: string, res: http.ServerResponse) => {
-    const jsonData = JSON.parse(data);
-    const user: User | null = repository.fetchUser(jsonData.name);
-    if (user === null) {
+addHandler("/quiz", "POST", (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => {
+  const user: User | null = fetchUserBySessionHeader(req);
+  if (user === null) {
+    res.writeHead(401, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "authentication required" }));
+    return;
+  }
+  handleJsonBody(req, url, res, (_url: URL, body: any, res: http.ServerResponse) => {
+    if (typeof body.title !== "string" || body.title.length === 0 || !Array.isArray(body.questions) || !body.questions.every(isValidQuestion)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "invalid quiz payload" }));
+      return;
+    }
+    const quiz: Quiz = {
+      uid: crypto.randomBytes(16).toString("hex"),
+      author: user.name,
+      title: body.title,
+      questions: body.questions as QuizQuestion[],
+    };
+    repository.uploadQuiz(quiz);
+    res.writeHead(201, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ uid: quiz.uid }));
+  });
+});
+
+addHandler("/quiz/score", "POST", (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => {
+  const id: string | null = url.searchParams.get("id");
+  if (id === null) {
+    res.writeHead(400);
+    res.end();
+    return;
+  }
+  handleJsonBody(req, url, res, (_url: URL, body: any, res: http.ServerResponse) => {
+    const quiz: Quiz | null = repository.fetchQuiz(id);
+    if (quiz === null) {
       res.writeHead(404);
       res.end();
       return;
     }
-    const attemptedPass: string = processPassword(jsonData.pass, user.salt);
-    if (attemptedPass != user.pass) {
-      res.writeHead(403);
-      res.end();
+    if (!Array.isArray(body.answers)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "answers must be an array" }));
+      return;
+    }
+    const results = quiz.questions.map((q, i) => ({ correct: gradeAnswer(q, body.answers[i]), weight: q.weight }));
+    const score = results.reduce((sum: number, r) => sum + (r.correct ? r.weight : 0), 0);
+    const maxScore = quiz.questions.reduce((sum: number, q) => sum + q.weight, 0);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ score, maxScore, questions: results }));
+  });
+});
+
+addHandler("/quizzes", "GET", (_req: http.IncomingMessage, _url: URL, res: http.ServerResponse) => {
+  const quizzes = repository.listQuizzes().map(q => ({ uid: q.uid, author: q.author, title: q.title }));
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(quizzes));
+});
+
+addHandler("/login", "POST", (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => {
+  handleJsonBody(req, url, res, (_url: URL, body: any, res: http.ServerResponse) => {
+    if (typeof body.name !== "string" || typeof body.pass !== "string") {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "name and pass are required" }));
+      return;
+    }
+    const user: User | null = repository.fetchUser(body.name);
+    if (user === null) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "invalid credentials" }));
+      return;
+    }
+    const attemptedPass: string = processPassword(body.pass, user.salt);
+    if (!crypto.timingSafeEqual(Buffer.from(attemptedPass), Buffer.from(user.pass))) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "invalid credentials" }));
       return;
     }
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -86,19 +202,23 @@ addHandler("/login", "POST", (req: http.IncomingMessage, url: URL, res: http.Ser
 });
 
 addHandler("/register", "POST", (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => {
-  handleMessageData(req, url, res, (_req: http.IncomingMessage, _url: URL, data: string, res: http.ServerResponse) => {
-    const jsonData = JSON.parse(data);
-    if (repository.fetchUser(jsonData.name) !== null) {
-      res.writeHead(400);
-      res.end();
+  handleJsonBody(req, url, res, (_url: URL, body: any, res: http.ServerResponse) => {
+    if (typeof body.name !== "string" || body.name.length === 0 || typeof body.pass !== "string" || body.pass.length === 0 || typeof body.email !== "string" || !/^\S+@\S+\.\S+$/.test(body.email)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "name, email and pass are required" }));
+      return;
+    }
+    if (repository.fetchUser(body.name) !== null) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "user already exists" }));
       return;
     }
     const salt: string = generateSalt();
     const user: User = {
-      name: jsonData.name,
-      email: jsonData.email,
+      name: body.name,
+      email: body.email,
       salt: salt,
-      pass: processPassword(jsonData.pass, salt),
+      pass: processPassword(body.pass, salt),
     }
     repository.uploadUser(user);
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -113,8 +233,8 @@ const server: http.Server = http.createServer((req: http.IncomingMessage, res: h
     handler.call(null, req, urlData, res);
     return;
   }
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end("Hello, world!");
+  res.writeHead(404);
+  res.end();
 })
 
 server.listen(8000);

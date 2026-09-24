@@ -48,6 +48,7 @@ export interface Repository {
   createSession(user: User): string;
   fetchQuiz(uid: string): Quiz | null;
   uploadQuiz(quiz: Quiz): void;
+  listQuizzes(): Quiz[];
 }
 
 class MapRepository implements Repository {
@@ -78,6 +79,9 @@ class MapRepository implements Repository {
   }
   uploadQuiz(quiz: Quiz): void {
     this.quizes.set(quiz.uid, quiz);
+  }
+  listQuizzes(): Quiz[] {
+    return Array.from(this.quizes.values());
   }
 }
 
