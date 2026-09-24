@@ -76,7 +76,7 @@
   }
 
   const addQuestion = () => {
-    q.value.questions.push(data.value);
+    saveQuestion();
     data.value.weight = null;
     data.value.question = null;
     data.value.kind = null;
@@ -117,7 +117,7 @@
   <div v-if="data.kind === AnswerKind.Radio">
     <div v-for="(o, i) in (data.answer as RadioAnswer).options">
       <input type="radio">
-        <input :value="o" @input="event => (data.answer as RadioAnswer).options[i] = event.target.value" />
+        <input :value="o" @input="event => (data.answer as RadioAnswer).options[i] = (event.target as HTMLInputElement).value" />
       </input>
       <button @click="event => (data.answer as RadioAnswer).options.splice(i, 1)">-</button>
     </div>
