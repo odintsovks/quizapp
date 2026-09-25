@@ -21,13 +21,20 @@ export async function api<T>(path: string, method: string = "GET", body?: unknow
   if (session !== null) {
     headers["X-Session"] = session;
   }
-  const res = await fetch(path, {
+  const res = await fetch(`/api${path}`, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`Request ${method} ${path} failed with status ${res.status}`);
+    let message = `Request ${method} ${path} failed with status ${res.status}`;
+    try {
+      const errBody = (await res.json()) as { error?: string };
+      if (typeof errBody.error === "string") {
+        message = errBody.error;
+      }
+    } catch {}
+    throw new Error(message);
   }
   return (await res.json()) as T;
 }
