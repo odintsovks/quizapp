@@ -12,10 +12,10 @@ export default defineConfig({
   ],
   server: {
     proxy: {
-      "/login": "http://localhost:8000",
-      "/register": "http://localhost:8000",
-      "/quiz": "http://localhost:8000",
-      "/quizzes": "http://localhost:8000",
+      "/api": {
+        target: "http://127.0.0.1:8000",
+        rewrite: (path) => path.replace(/^\/api/, ""),
+      },
     },
   },
   resolve: {
