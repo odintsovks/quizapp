@@ -177,6 +177,17 @@ addHandler("/quizzes", "GET", (_req: http.IncomingMessage, _url: URL, res: http.
   res.end(JSON.stringify(quizzes));
 });
 
+addHandler("/me", "GET", (req: http.IncomingMessage, _url: URL, res: http.ServerResponse) => {
+  const user: User | null = fetchUserBySessionHeader(req);
+  if (user === null) {
+    res.writeHead(401, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "authentication required" }));
+    return;
+  }
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ name: user.name }));
+});
+
 addHandler("/login", "POST", (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => {
   handleJsonBody(req, url, res, (_url: URL, body: any, res: http.ServerResponse) => {
     if (typeof body.name !== "string" || typeof body.pass !== "string") {
