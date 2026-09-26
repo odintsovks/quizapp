@@ -1,12 +1,19 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { api } from '../api'
+import { api, getSession } from '../api'
+import { connectWebSocket, sendWs, type WsMessage } from '../ws'
 
 enum AnswerKind {
   Radio,
   Checkbox,
   TextEdit
+}
+
+enum QuizStatus {
+  Draft,
+  Active,
+  Finished
 }
 
 interface QuizQuestion {
@@ -16,85 +23,164 @@ interface QuizQuestion {
   options?: string[];
 }
 
-interface QuizData {
+interface QuestionResult {
+  question: string;
+  correct: boolean;
+  weight: number;
+}
+
+interface JoinedQuiz {
+  quizId: string;
   author: string;
   title: string;
+  status: QuizStatus;
   questions: QuizQuestion[];
+  participants: string[];
+  isOrganizer: boolean;
 }
 
 interface ScoreResult {
   score: number;
   maxScore: number;
-  questions: { question: string; correct: boolean; weight: number }[];
+  questions: QuestionResult[];
 }
 
 const route = useRoute()
 const id: string = typeof route.params.id === 'string' ? route.params.id : ''
 
-const quiz = ref<QuizData | null>(null)
+const name = ref('')
 const error = ref('')
+const joined = ref<JoinedQuiz | null>(null)
 // one entry per question: radio -> option index, checkbox -> selected indices, text -> the text
 const answers = ref<(number | null | number[] | string)[]>([])
 const result = ref<ScoreResult | null>(null)
 
-const load = async () => {
-  try {
-    const data: QuizData = await api<QuizData>(`/quiz?id=${id}`)
-    quiz.value = data
-    answers.value = data.questions.map(q => q.kind === AnswerKind.Checkbox ? [] : q.kind === AnswerKind.TextEdit ? '' : null)
-  } catch (err) {
-    error.value = (err as Error).message
-  }
-}
+let ws: WebSocket | null = null
 
-const submit = async () => {
-  const data: QuizData | null = quiz.value
-  if (data === null) return
-  try {
-    const res: ScoreResult = await api<ScoreResult>(`/quiz/score?id=${id}`, 'POST', { answers: answers.value })
-    result.value = {
-      score: res.score,
-      maxScore: res.maxScore,
-      questions: res.questions.map((r, i) => ({ question: data.questions[i]?.question ?? '', correct: r.correct, weight: r.weight })),
+const handleMessage = (msg: WsMessage) => {
+  switch (msg.type) {
+    case 'joined': {
+      const quiz = msg as unknown as JoinedQuiz
+      joined.value = quiz
+      answers.value = quiz.questions.map(q => q.kind === AnswerKind.Checkbox ? [] : q.kind === AnswerKind.TextEdit ? '' : null)
+      error.value = ''
+      break
     }
+    case 'quiz-status': {
+      if (joined.value !== null) {
+        joined.value.status = msg.status as QuizStatus
+      }
+      break
+    }
+    case 'participant-joined': {
+      const quiz = joined.value
+      const participantName = msg.name as string
+      if (quiz !== null && !quiz.participants.includes(participantName)) {
+        quiz.participants.push(participantName)
+      }
+      break
+    }
+    case 'participant-left': {
+      const quiz = joined.value
+      const participantName = msg.name as string
+      if (quiz !== null) {
+        const index = quiz.participants.indexOf(participantName)
+        if (index >= 0) quiz.participants.splice(index, 1)
+      }
+      break
+    }
+    case 'scored': {
+      result.value = msg as unknown as ScoreResult
+      break
+    }
+    case 'error': {
+      error.value = msg.error as string
+      break
+    }
+  }
+}
+
+const connect = () => {
+  const session = getSession()
+  ws = connectWebSocket(handleMessage)
+  ws.onopen = () => {
+    if (ws === null) return
+    const join: Record<string, unknown> = { type: 'join', quizId: id }
+    if (session !== null) join.session = session
+    if (name.value.trim() !== '') join.name = name.value.trim()
+    sendWs(ws, join)
+  }
+  ws.onerror = () => {
+    if (joined.value === null) error.value = 'could not connect to the quiz server'
+  }
+}
+
+const doJoin = () => {
+  error.value = ''
+  connect()
+}
+
+const submit = () => {
+  if (ws !== null) sendWs(ws, { type: 'answer', answers: answers.value })
+}
+
+const controlQuiz = async (action: string) => {
+  try {
+    await api(`/quiz/${action}?id=${id}`, 'POST')
+    error.value = ''
   } catch (err) {
     error.value = (err as Error).message
   }
 }
 
-onMounted(load)
+onBeforeUnmount(() => {
+  ws?.close()
+})
 </script>
 
 <template>
   <p v-if="error !== ''">{{ error }}</p>
-  <div v-else-if="result !== null">
-    <h1>{{ quiz?.title ?? '' }}</h1>
-    <p>score: {{ result.score }} / {{ result.maxScore }}</p>
-    <ul>
-      <li v-for="(r, i) in result.questions" :key="i">
-        {{ r.question }} (weight {{ r.weight }}): {{ r.correct ? 'correct' : 'incorrect' }}
-      </li>
-    </ul>
-  </div>
-  <form v-else-if="quiz !== null" @submit.prevent="submit">
-    <h1>{{ quiz.title }}</h1>
-    <p>by {{ quiz.author }}</p>
-    <div v-for="(q, qi) in quiz.questions" :key="qi">
-      <p>{{ q.question }} (weight {{ q.weight }})</p>
-      <template v-if="q.kind === AnswerKind.Radio">
-        <label v-for="(o, i) in q.options ?? []" :key="i">
-          <input type="radio" :name="'question' + qi" :value="i" v-model="answers[qi]" /> {{ o }}
-        </label>
-      </template>
-      <template v-else-if="q.kind === AnswerKind.Checkbox">
-        <label v-for="(o, i) in q.options ?? []" :key="i">
-          <input type="checkbox" :value="i" v-model="answers[qi]" /> {{ o }}
-        </label>
-      </template>
-      <input v-else v-model="answers[qi]" />
-    </div>
-    <button type="submit">Submit</button>
+  <form v-if="joined === null" @submit.prevent="doJoin">
+    <h1>Join quiz</h1>
+    <input v-model="name" placeholder="Your name" />
+    <button type="submit">Join</button>
   </form>
+  <div v-else>
+    <h1>{{ joined.title }}</h1>
+    <p>by {{ joined.author }}</p>
+    <p v-if="joined.participants.length > 0">participants: {{ joined.participants.join(', ') }}</p>
+    <div v-if="joined.isOrganizer">
+      <button v-if="joined.status === QuizStatus.Draft" @click="controlQuiz('start')">Start quiz</button>
+      <button v-if="joined.status === QuizStatus.Active" @click="controlQuiz('end')">End quiz</button>
+    </div>
+    <template v-if="result !== null">
+      <p>score: {{ result.score }} / {{ result.maxScore }}</p>
+      <ul>
+        <li v-for="(r, i) in result.questions" :key="i">
+          {{ r.question }} (weight {{ r.weight }}): {{ r.correct ? 'correct' : 'incorrect' }}
+        </li>
+      </ul>
+    </template>
+    <form v-else-if="joined.status === QuizStatus.Active" @submit.prevent="submit">
+      <div v-for="(q, qi) in joined.questions" :key="qi">
+        <p>{{ q.question }} (weight {{ q.weight }})</p>
+        <template v-if="q.kind === AnswerKind.Radio">
+          <label v-for="(o, i) in q.options ?? []" :key="i">
+            <input type="radio" :name="'question' + qi" :value="i" v-model="answers[qi]" /> {{ o }}
+          </label>
+        </template>
+        <template v-else-if="q.kind === AnswerKind.Checkbox">
+          <label v-for="(o, i) in q.options ?? []" :key="i">
+            <input type="checkbox" :value="i" v-model="answers[qi]" /> {{ o }}
+          </label>
+        </template>
+        <input v-else v-model="answers[qi]" />
+      </div>
+      <button type="submit">Submit</button>
+    </form>
+    <p v-else-if="joined.status === QuizStatus.Draft">The quiz has not started yet.</p>
+    <p v-else>The quiz has ended.</p>
+  </div>
 </template>
 
 <style scoped></style>
