@@ -96,4 +96,41 @@ class MapRepository implements Repository {
   }
 }
 
+export function gradeAnswer(question: QuizQuestion, given: unknown): boolean {
+  switch (question.kind) {
+    case AnswerKind.Radio:
+      return given === (question.answer as RadioAnswer).correctAnswer;
+    case AnswerKind.Checkbox: {
+      if (!Array.isArray(given) || !given.every(v => typeof v === "number")) return false;
+      const expected = [...(question.answer as CheckboxAnswer).correctAnswers].sort((a, b) => a - b);
+      const actual = (given as number[]).sort((a, b) => a - b);
+      return expected.length === actual.length && expected.every((v, i) => v === actual[i]);
+    }
+    case AnswerKind.TextEdit: {
+      if (typeof given !== "string") return false;
+      const normalized = given.trim().toLowerCase();
+      return (question.answer as TextEditAnswer).correctAnswers.some(a => a.trim().toLowerCase() === normalized);
+    }
+  }
+}
+
+// public view of the questions, without the correct answers
+export function stripAnswers(questions: QuizQuestion[]): Object[] {
+  var result: Object[] = [];
+  for (const q of questions) {
+    switch (q.kind) {
+      case AnswerKind.Radio:
+        result.push({ question: q.question, weight: q.weight, kind: q.kind, options: (q.answer as RadioAnswer).options })
+        break;
+      case AnswerKind.Checkbox:
+        result.push({ question: q.question, weight: q.weight, kind: q.kind, options: (q.answer as CheckboxAnswer).options })
+        break;
+      case AnswerKind.TextEdit:
+        result.push({ question: q.question, weight: q.weight, kind: q.kind })
+        break;
+    }
+  }
+  return result;
+}
+
 export const repository: Repository = new MapRepository()

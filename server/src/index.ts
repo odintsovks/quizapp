@@ -1,6 +1,7 @@
 import http = require("http");
 import crypto = require("crypto");
-import { repository, User, Quiz, QuizStatus, QuizQuestion, AnswerKind, RadioAnswer, CheckboxAnswer, TextEditAnswer } from "./repository";
+import { repository, User, Quiz, QuizStatus, QuizQuestion, AnswerKind, RadioAnswer, CheckboxAnswer, TextEditAnswer, stripAnswers, gradeAnswer } from "./repository";
+import { attachWebSocketServer, announceQuizStatus } from "./ws";
 
 function generateSalt(): string {
   return crypto.randomBytes(16).toString("hex");
@@ -44,24 +45,6 @@ function fetchUserBySessionHeader(req: http.IncomingMessage): User | null {
   return repository.fetchUserBySession(token);
 }
 
-function stripAnswers(questions: QuizQuestion[]): Object[] {
-  var result: Object[] = [];
-  for (const q of questions) {
-    switch (q.kind) {
-      case AnswerKind.Radio:
-        result.push({ question: q.question, weight: q.weight, kind: q.kind, options: (q.answer as RadioAnswer).options })
-        break;
-      case AnswerKind.Checkbox:
-        result.push({ question: q.question, weight: q.weight, kind: q.kind, options: (q.answer as CheckboxAnswer).options })
-        break;
-      case AnswerKind.TextEdit:
-        result.push({ question: q.question, weight: q.weight, kind: q.kind })
-        break;
-    }
-  }
-  return result;
-}
-
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(v => typeof v === "string");
 }
@@ -81,24 +64,6 @@ function isValidQuestion(value: unknown): value is QuizQuestion {
       return isStringArray(answer.correctAnswers);
     default:
       return false;
-  }
-}
-
-function gradeAnswer(question: QuizQuestion, given: unknown): boolean {
-  switch (question.kind) {
-    case AnswerKind.Radio:
-      return given === (question.answer as RadioAnswer).correctAnswer;
-    case AnswerKind.Checkbox: {
-      if (!Array.isArray(given) || !given.every(v => typeof v === "number")) return false;
-      const expected = [...(question.answer as CheckboxAnswer).correctAnswers].sort((a, b) => a - b);
-      const actual = (given as number[]).sort((a, b) => a - b);
-      return expected.length === actual.length && expected.every((v, i) => v === actual[i]);
-    }
-    case AnswerKind.TextEdit: {
-      if (typeof given !== "string") return false;
-      const normalized = given.trim().toLowerCase();
-      return (question.answer as TextEditAnswer).correctAnswers.some(a => a.trim().toLowerCase() === normalized);
-    }
   }
 }
 
@@ -178,6 +143,7 @@ function handleQuizControl(url: URL, user: User, from: QuizStatus, to: QuizStatu
   }
   quiz.status = to;
   repository.updateQuiz(quiz);
+  announceQuizStatus(id, to);
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ status: quiz.status }));
 }
@@ -310,5 +276,7 @@ const server: http.Server = http.createServer((req: http.IncomingMessage, res: h
   res.writeHead(404);
   res.end();
 })
+
+attachWebSocketServer(server);
 
 server.listen(8000);
