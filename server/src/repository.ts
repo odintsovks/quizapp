@@ -34,10 +34,17 @@ export interface QuizQuestion {
   answer: RadioAnswer | CheckboxAnswer | TextEditAnswer;
 }
 
+export enum QuizStatus {
+  Draft,
+  Active,
+  Finished
+}
+
 export interface Quiz {
   uid: string;
   author: string;
   title: string;
+  status: QuizStatus;
   questions: QuizQuestion[];
 }
 
@@ -48,6 +55,7 @@ export interface Repository {
   createSession(user: User): string;
   fetchQuiz(uid: string): Quiz | null;
   uploadQuiz(quiz: Quiz): void;
+  updateQuiz(quiz: Quiz): void;
   listQuizzes(): Quiz[];
 }
 
@@ -78,6 +86,9 @@ class MapRepository implements Repository {
     return quiz === undefined ? null : quiz; 
   }
   uploadQuiz(quiz: Quiz): void {
+    this.quizes.set(quiz.uid, quiz);
+  }
+  updateQuiz(quiz: Quiz): void {
     this.quizes.set(quiz.uid, quiz);
   }
   listQuizzes(): Quiz[] {

@@ -1,6 +1,6 @@
 import http = require("http");
 import crypto = require("crypto");
-import { repository, User, Quiz, QuizQuestion, AnswerKind, RadioAnswer, CheckboxAnswer, TextEditAnswer } from "./repository";
+import { repository, User, Quiz, QuizStatus, QuizQuestion, AnswerKind, RadioAnswer, CheckboxAnswer, TextEditAnswer } from "./repository";
 
 function generateSalt(): string {
   return crypto.randomBytes(16).toString("hex");
@@ -115,6 +115,14 @@ addHandler("/quiz", "GET", (req: http.IncomingMessage, url: URL, res: http.Serve
     res.end();
     return;
   }
+  if (quiz.status === QuizStatus.Draft) {
+    const user: User | null = fetchUserBySessionHeader(req);
+    if (user === null || user.name !== quiz.author) {
+      res.writeHead(404);
+      res.end();
+      return;
+    }
+  }
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ author: quiz.author, title: quiz.title, questions: stripAnswers(quiz.questions) }));
 });
@@ -136,12 +144,62 @@ addHandler("/quiz", "POST", (req: http.IncomingMessage, url: URL, res: http.Serv
       uid: crypto.randomBytes(16).toString("hex"),
       author: user.name,
       title: body.title,
+      status: QuizStatus.Draft,
       questions: body.questions as QuizQuestion[],
     };
     repository.uploadQuiz(quiz);
     res.writeHead(201, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ uid: quiz.uid }));
   });
+});
+
+function handleQuizControl(url: URL, user: User, from: QuizStatus, to: QuizStatus, res: http.ServerResponse): void {
+  const id: string | null = url.searchParams.get("id");
+  if (id === null) {
+    res.writeHead(400);
+    res.end();
+    return;
+  }
+  const quiz: Quiz | null = repository.fetchQuiz(id);
+  if (quiz === null) {
+    res.writeHead(404);
+    res.end();
+    return;
+  }
+  if (quiz.author !== user.name) {
+    res.writeHead(403, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "not your quiz" }));
+    return;
+  }
+  if (quiz.status !== from) {
+    res.writeHead(409, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: `quiz is not ${QuizStatus[from].toLowerCase()}` }));
+    return;
+  }
+  quiz.status = to;
+  repository.updateQuiz(quiz);
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ status: quiz.status }));
+}
+
+addHandler("/quiz/start", "POST", (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => {
+  const user: User | null = fetchUserBySessionHeader(req);
+  if (user === null) {
+    res.writeHead(401, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "authentication required" }));
+    return;
+  }
+  handleQuizControl(url, user, QuizStatus.Draft, QuizStatus.Active, res);
+});
+
+addHandler("/quiz/end", "POST", (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => {
+  const user: User | null = fetchUserBySessionHeader(req);
+  if (user === null) {
+    res.writeHead(401, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "authentication required" }));
+    return;
+  }
+  handleQuizControl(url, user, QuizStatus.Active, QuizStatus.Finished, res);
 });
 
 addHandler("/quiz/score", "POST", (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => {
@@ -158,6 +216,11 @@ addHandler("/quiz/score", "POST", (req: http.IncomingMessage, url: URL, res: htt
       res.end();
       return;
     }
+    if (quiz.status !== QuizStatus.Active) {
+      res.writeHead(409, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "quiz is not active" }));
+      return;
+    }
     if (!Array.isArray(body.answers)) {
       res.writeHead(400, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "answers must be an array" }));
@@ -172,7 +235,7 @@ addHandler("/quiz/score", "POST", (req: http.IncomingMessage, url: URL, res: htt
 });
 
 addHandler("/quizzes", "GET", (_req: http.IncomingMessage, _url: URL, res: http.ServerResponse) => {
-  const quizzes = repository.listQuizzes().map(q => ({ uid: q.uid, author: q.author, title: q.title }));
+  const quizzes = repository.listQuizzes().map(q => ({ uid: q.uid, author: q.author, title: q.title, status: q.status }));
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify(quizzes));
 });
