@@ -45,6 +45,12 @@ interface ScoreResult {
   questions: QuestionResult[];
 }
 
+interface LeaderboardEntry {
+  name: string;
+  score: number;
+  maxScore: number;
+}
+
 const route = useRoute()
 const id: string = typeof route.params.id === 'string' ? route.params.id : ''
 
@@ -54,15 +60,17 @@ const joined = ref<JoinedQuiz | null>(null)
 // one entry per question: radio -> option index, checkbox -> selected indices, text -> the text
 const answers = ref<(number | null | number[] | string)[]>([])
 const result = ref<ScoreResult | null>(null)
+const leaderboard = ref<LeaderboardEntry[] | null>(null)
 
 let ws: WebSocket | null = null
 
 const handleMessage = (msg: WsMessage) => {
   switch (msg.type) {
     case 'joined': {
-      const quiz = msg as unknown as JoinedQuiz
+      const quiz = msg as unknown as JoinedQuiz & { leaderboard?: LeaderboardEntry[] }
       joined.value = quiz
       answers.value = quiz.questions.map(q => q.kind === AnswerKind.Checkbox ? [] : q.kind === AnswerKind.TextEdit ? '' : null)
+      if (quiz.leaderboard !== undefined) leaderboard.value = quiz.leaderboard
       error.value = ''
       break
     }
@@ -91,6 +99,10 @@ const handleMessage = (msg: WsMessage) => {
     }
     case 'scored': {
       result.value = msg as unknown as ScoreResult
+      break
+    }
+    case 'leaderboard': {
+      leaderboard.value = msg.entries as LeaderboardEntry[]
       break
     }
     case 'error': {
@@ -180,6 +192,12 @@ onBeforeUnmount(() => {
     </form>
     <p v-else-if="joined.status === QuizStatus.Draft">The quiz has not started yet.</p>
     <p v-else>The quiz has ended.</p>
+    <div v-if="leaderboard !== null && leaderboard.length > 0">
+      <h2>Leaderboard</h2>
+      <ol>
+        <li v-for="(e, i) in leaderboard" :key="i">{{ e.name }} — {{ e.score }} / {{ e.maxScore }}</li>
+      </ol>
+    </div>
   </div>
 </template>
 
