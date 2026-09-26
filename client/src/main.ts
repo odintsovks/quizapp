@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import { createWebHistory, createRouter } from 'vue-router'
+import { getSession } from './api'
 import App from './App.vue'
 import HomeView from './views/Home.vue'
 import LoginView from './views/Login.vue'
@@ -14,7 +15,7 @@ export const router = createRouter({
     { path: '/login', component: LoginView },
     { path: '/register', component: RegisterView },
     { path: '/quiz/:id', component: QuizView },
-    { path: '/editor', component: EditorView },
+    { path: '/editor', component: EditorView, beforeEnter: () => getSession() !== null || '/login' },
   ]
 });
 
