@@ -71,7 +71,11 @@ function handleJoin(ws: WebSocket, state: ClientState, msg: any): void {
   state.quizId = quiz.uid;
   state.name = isOrganizer && user !== null ? user.name : (msg.name as string).trim();
   state.isOrganizer = isOrganizer;
-  send(ws, { type: "joined", ...publicQuiz(quiz), participants: participantNames(quiz.uid), isOrganizer });
+  const payload: Record<string, unknown> = { type: "joined", ...publicQuiz(quiz), participants: participantNames(quiz.uid), isOrganizer };
+  if (quiz.status === QuizStatus.Finished) {
+    payload.leaderboard = repository.fetchLeaderboard(quiz.uid);
+  }
+  send(ws, payload);
   broadcastToQuiz(quiz.uid, { type: "participant-joined", name: state.name }, ws);
 }
 
@@ -92,6 +96,7 @@ function handleAnswer(ws: WebSocket, state: ClientState, msg: any): void {
   const results = quiz.questions.map((q, i) => ({ question: q.question, correct: gradeAnswer(q, msg.answers[i]), weight: q.weight }));
   const score = results.reduce((sum: number, r) => sum + (r.correct ? r.weight : 0), 0);
   const maxScore = quiz.questions.reduce((sum: number, q) => sum + q.weight, 0);
+  repository.saveResult(quiz.uid, state.name, score, maxScore);
   send(ws, { type: "scored", score, maxScore, questions: results });
 }
 
@@ -141,4 +146,8 @@ export function attachWebSocketServer(server: http.Server): void {
 
 export function announceQuizStatus(quizId: string, status: QuizStatus): void {
   broadcastToQuiz(quizId, { type: "quiz-status", status });
+}
+
+export function announceLeaderboard(quizId: string): void {
+  broadcastToQuiz(quizId, { type: "leaderboard", entries: repository.fetchLeaderboard(quizId) });
 }

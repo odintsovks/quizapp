@@ -1,7 +1,7 @@
 import http = require("http");
 import crypto = require("crypto");
-import { repository, User, Quiz, QuizStatus, QuizQuestion, AnswerKind, RadioAnswer, CheckboxAnswer, TextEditAnswer, stripAnswers, gradeAnswer } from "./repository";
-import { attachWebSocketServer, announceQuizStatus } from "./ws";
+import { repository, User, Quiz, QuizStatus, QuizQuestion, AnswerKind, stripAnswers } from "./repository";
+import { attachWebSocketServer, announceQuizStatus, announceLeaderboard } from "./ws";
 
 function generateSalt(): string {
   return crypto.randomBytes(16).toString("hex");
@@ -144,6 +144,9 @@ function handleQuizControl(url: URL, user: User, from: QuizStatus, to: QuizStatu
   quiz.status = to;
   repository.updateQuiz(quiz);
   announceQuizStatus(id, to);
+  if (to === QuizStatus.Finished) {
+    announceLeaderboard(id);
+  }
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ status: quiz.status }));
 }
@@ -166,38 +169,6 @@ addHandler("/quiz/end", "POST", (req: http.IncomingMessage, url: URL, res: http.
     return;
   }
   handleQuizControl(url, user, QuizStatus.Active, QuizStatus.Finished, res);
-});
-
-addHandler("/quiz/score", "POST", (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => {
-  const id: string | null = url.searchParams.get("id");
-  if (id === null) {
-    res.writeHead(400);
-    res.end();
-    return;
-  }
-  handleJsonBody(req, url, res, (_url: URL, body: any, res: http.ServerResponse) => {
-    const quiz: Quiz | null = repository.fetchQuiz(id);
-    if (quiz === null) {
-      res.writeHead(404);
-      res.end();
-      return;
-    }
-    if (quiz.status !== QuizStatus.Active) {
-      res.writeHead(409, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "quiz is not active" }));
-      return;
-    }
-    if (!Array.isArray(body.answers)) {
-      res.writeHead(400, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "answers must be an array" }));
-      return;
-    }
-    const results = quiz.questions.map((q, i) => ({ correct: gradeAnswer(q, body.answers[i]), weight: q.weight }));
-    const score = results.reduce((sum: number, r) => sum + (r.correct ? r.weight : 0), 0);
-    const maxScore = quiz.questions.reduce((sum: number, q) => sum + q.weight, 0);
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ score, maxScore, questions: results }));
-  });
 });
 
 addHandler("/quizzes", "GET", (_req: http.IncomingMessage, _url: URL, res: http.ServerResponse) => {
