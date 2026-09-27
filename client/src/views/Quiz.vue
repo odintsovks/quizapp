@@ -151,7 +151,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <p v-if="error !== ''">{{ error }}</p>
+  <p class="error" v-if="error !== ''">{{ error }}</p>
   <form v-if="joined === null" @submit.prevent="doJoin">
     <h1>Join quiz</h1>
     <input v-model="name" placeholder="Your name" />

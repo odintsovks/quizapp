@@ -33,7 +33,7 @@ const doRegister = async () => {
         <tr><td colspan="2"><button type="submit">Register</button></td></tr>
       </tbody>
     </table>
-    <p v-if="error !== ''">{{ error }}</p>
+    <p class="error" v-if="error !== ''">{{ error }}</p>
   </form>
 </template>
 

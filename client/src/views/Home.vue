@@ -65,7 +65,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <p v-if="error !== ''">{{ error }}</p>
+  <p class="error" v-if="error !== ''">{{ error }}</p>
   <p v-if="name !== ''">logged in as {{ name }}</p>
   <button v-if="name !== ''" @click="router.push('/editor')">Create quiz</button>
   <button v-if="name !== ''" @click="logout">Logout</button>

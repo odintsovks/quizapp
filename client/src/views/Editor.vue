@@ -183,7 +183,7 @@
 </script>
 
 <template>
-  <p v-if="error !== ''">{{ error }}</p>
+  <p class="error" v-if="error !== ''">{{ error }}</p>
   <input v-model="q.title" placeholder="Title" />
   <p>by {{ author }}</p>
   <div>

@@ -34,7 +34,7 @@ const doLogin = async () => {
         <tr><td colspan="2"><button type="submit">Login</button><button type="button" @click="goToRegister">Register</button></td></tr>
       </tbody>
     </table>
-    <p v-if="error !== ''">{{ error }}</p>
+    <p class="error" v-if="error !== ''">{{ error }}</p>
   </form>
 </template>
 

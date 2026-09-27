@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import { createWebHistory, createRouter } from 'vue-router'
 import { getSession } from './api'
+import './style.css'
 import App from './App.vue'
 import HomeView from './views/Home.vue'
 import LoginView from './views/Login.vue'
