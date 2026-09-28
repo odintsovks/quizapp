@@ -184,46 +184,48 @@
 
 <template>
   <p class="error" v-if="error !== ''">{{ error }}</p>
-  <input v-model="q.title" placeholder="Title" />
-  <p>by {{ author }}</p>
-  <div>
-    <button @click="setQuestionKind(AnswerKind.Radio)">Radio</button>
-    <button @click="setQuestionKind(AnswerKind.Checkbox)">CheckBox</button>
-    <button @click="setQuestionKind(AnswerKind.TextEdit)">TextEdit</button>
-  </div>
-  <input v-model="data.question" placeholder="Question text" />
-  <input type="number" :value="data.weight ?? ''" @input="setWeight" placeholder="Weight" />
-  <div v-if="data.kind === AnswerKind.Radio && data.answer !== null">
-    <div v-for="(o, i) in (data.answer as RadioAnswer).options" :key="i">
-      <input type="radio" name="correctRadio" :checked="(data.answer as RadioAnswer).correctAnswer === i" @change="(data.answer as RadioAnswer).correctAnswer = i" />
-      <input :value="o" @input="event => (data.answer as RadioAnswer).options[i] = (event.target as HTMLInputElement).value" />
-      <button v-if="(data.answer as RadioAnswer).options.length > 1" @click="removeRadioOption(i)">-</button>
+  <input v-model="q.title" placeholder="Title"/>
+  <div class="frame" style="display: flex; flex-direction: column;">
+    <h2 style="line-height: 0">Contents</h2>
+    <textarea v-model="data.question" placeholder="Question text" style="flex: 2; flex-basis: 150px;"/>
+    <div>
+      <button @click="setQuestionKind(AnswerKind.Radio)">Radio</button>
+      <button @click="setQuestionKind(AnswerKind.Checkbox)">CheckBox</button>
+      <button @click="setQuestionKind(AnswerKind.TextEdit)">TextEdit</button>
+      <input type="number" :value="data.weight ?? ''" @input="setWeight" placeholder="Weight" />
     </div>
-    <button @click="(data.answer as RadioAnswer).options.push('Answer')">+</button>
-  </div>
-  <div v-else-if="data.kind === AnswerKind.Checkbox && data.answer !== null">
-    <div v-for="(o, i) in (data.answer as CheckboxAnswer).options" :key="i">
-      <input type="checkbox" :checked="(data.answer as CheckboxAnswer).correctAnswers.includes(i)" @change="event => toggleCheckboxCorrect(i, (event.target as HTMLInputElement).checked)" />
-      <input :value="o" @input="event => (data.answer as CheckboxAnswer).options[i] = (event.target as HTMLInputElement).value" />
-      <button v-if="(data.answer as CheckboxAnswer).options.length > 1" @click="removeCheckboxOption(i)">-</button>
+    <div v-if="data.kind === AnswerKind.Radio && data.answer !== null">
+      <div v-for="(o, i) in (data.answer as RadioAnswer).options" :key="i">
+        <input type="radio" name="correctRadio" :checked="(data.answer as RadioAnswer).correctAnswer === i" @change="(data.answer as RadioAnswer).correctAnswer = i" />
+        <input :value="o" @input="event => (data.answer as RadioAnswer).options[i] = (event.target as HTMLInputElement).value" />
+        <button v-if="(data.answer as RadioAnswer).options.length > 1" @click="removeRadioOption(i)">-</button>
+      </div>
+      <button @click="(data.answer as RadioAnswer).options.push('Answer')">+</button>
     </div>
-    <button @click="(data.answer as CheckboxAnswer).options.push('Answer')">+</button>
-  </div>
-  <div v-else-if="data.kind === AnswerKind.TextEdit && data.answer !== null">
-    <div v-for="(ans, i) in (data.answer as TextEditAnswer).correctAnswers" :key="i">
-      <input :value="ans" @input="event => (data.answer as TextEditAnswer).correctAnswers[i] = (event.target as HTMLInputElement).value" />
-      <button v-if="(data.answer as TextEditAnswer).correctAnswers.length > 1" @click="(data.answer as TextEditAnswer).correctAnswers.splice(i, 1)">-</button>
+    <div v-else-if="data.kind === AnswerKind.Checkbox && data.answer !== null">
+      <div v-for="(o, i) in (data.answer as CheckboxAnswer).options" :key="i">
+        <input type="checkbox" :checked="(data.answer as CheckboxAnswer).correctAnswers.includes(i)" @change="event => toggleCheckboxCorrect(i, (event.target as HTMLInputElement).checked)" />
+        <input :value="o" @input="event => (data.answer as CheckboxAnswer).options[i] = (event.target as HTMLInputElement).value" />
+        <button v-if="(data.answer as CheckboxAnswer).options.length > 1" @click="removeCheckboxOption(i)">-</button>
+      </div>
+      <button @click="(data.answer as CheckboxAnswer).options.push('Answer')">+</button>
     </div>
-    <button @click="(data.answer as TextEditAnswer).correctAnswers.push('Answer')">+</button>
+    <div v-else-if="data.kind === AnswerKind.TextEdit && data.answer !== null">
+      <div v-for="(ans, i) in (data.answer as TextEditAnswer).correctAnswers" :key="i">
+        <input :value="ans" @input="event => (data.answer as TextEditAnswer).correctAnswers[i] = (event.target as HTMLInputElement).value" />
+        <button v-if="(data.answer as TextEditAnswer).correctAnswers.length > 1" @click="(data.answer as TextEditAnswer).correctAnswers.splice(i, 1)">-</button>
+      </div>
+      <button @click="(data.answer as TextEditAnswer).correctAnswers.push('Answer')">+</button>
+    </div>
+    <button @click="saveQuestion">Save</button>
+    <div v-for="(page, i) in q.questions" :key="i">
+      <button @click="gotoQuestion(i)">{{ i + 1 }}</button>
+      <button @click="deleteQuestion(i)">x</button>
+    </div>
+    <button @click="addQuestion">New question</button>
+    <button @click="saveQuiz">Save quiz</button>
+    <p v-if="savedUid !== null">Saved: <a :href="'/quiz/' + savedUid">{{ savedUid }}</a></p>
   </div>
-  <button @click="saveQuestion">Save</button>
-  <div v-for="(page, i) in q.questions" :key="i">
-    <button @click="gotoQuestion(i)">{{ i + 1 }}</button>
-    <button @click="deleteQuestion(i)">x</button>
-  </div>
-  <button @click="addQuestion">New question</button>
-  <button @click="saveQuiz">Save quiz</button>
-  <p v-if="savedUid !== null">Saved: <a :href="'/quiz/' + savedUid">{{ savedUid }}</a></p>
 </template>
 
 <style scoped></style>

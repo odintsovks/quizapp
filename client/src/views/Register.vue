@@ -25,15 +25,21 @@ const doRegister = async () => {
 
 <template>
   <form @submit.prevent="doRegister">
-    <table>
-      <tbody>
-        <tr><td>login</td><td><input v-model="login" placeholder="login" /></td></tr>
-        <tr><td>email</td><td><input v-model="email" type="email" placeholder="email" /></td></tr>
-        <tr><td>password</td><td><input v-model="password" type="password" placeholder="password" /></td></tr>
-        <tr><td colspan="2"><button type="submit">Register</button></td></tr>
-      </tbody>
-    </table>
-    <p class="error" v-if="error !== ''">{{ error }}</p>
+    <div class="frame">
+      <h1 class="center">Register</h1>
+      <table>
+        <tbody>
+          <tr><td><h2>Username</h2></td></tr>
+          <tr><td><input v-model="login" placeholder="Username" /></td></tr>
+          <tr><td><h2>E-mail</h2></td></tr>
+          <tr><td><input v-model="email" type="email" placeholder="E-mail" /></td></tr>
+          <tr><td><h2>Password</h2></td></tr>
+          <tr><td><input v-model="password" type="password" placeholder="Password" /></td></tr>
+          <tr><td><button type="submit">Register</button></td></tr>
+        </tbody>
+      </table>
+      <p class="error" v-if="error !== ''">{{ error }}</p>
+    </div>
   </form>
 </template>
 

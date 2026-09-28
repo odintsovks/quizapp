@@ -66,20 +66,24 @@ onMounted(() => {
 
 <template>
   <p class="error" v-if="error !== ''">{{ error }}</p>
-  <p v-if="name !== ''">logged in as {{ name }}</p>
-  <button v-if="name !== ''" @click="router.push('/editor')">Create quiz</button>
-  <button v-if="name !== ''" @click="logout">Logout</button>
-  <button v-else @click="router.push('/login')">Login/Register</button>
-  <h2>Quizzes</h2>
-  <ul>
-    <li v-for="quiz in quizzes" :key="quiz.uid">
-      <a v-if="quiz.status === QuizStatus.Active" :href="'/quiz/' + quiz.uid">{{ quiz.title }}</a>
-      <span v-else>{{ quiz.title }} ({{ statusText(quiz.status) }})</span>
-      by {{ quiz.author }}
-      <button v-if="quiz.author === name && quiz.status === QuizStatus.Draft" @click="controlQuiz(quiz.uid, 'start')">Start</button>
-      <button v-if="quiz.author === name && quiz.status === QuizStatus.Active" @click="controlQuiz(quiz.uid, 'end')">End</button>
-    </li>
-  </ul>
+  <div class="frame">
+    <button v-if="name !== ''" @click="router.push('/editor')">Create Quiz</button>
+    <button v-if="name !== ''" @click="logout" style="float: right;">Logout</button>
+    <button v-else @click="router.push('/login')">Login/Register</button>
+    <p v-if="name !== ''" style="float: right;">Logged in as {{ name }} </p>
+  </div>
+  <div class="frame">
+    <h2>Quizzes</h2>
+    <ul>
+      <li v-for="quiz in quizzes" :key="quiz.uid">
+        <a v-if="quiz.status === QuizStatus.Active" :href="'/quiz/' + quiz.uid">{{ quiz.title }}</a>
+        <span v-else>{{ quiz.title }} ({{ statusText(quiz.status) }})</span>
+        by {{ quiz.author }}
+        <button v-if="quiz.author === name && quiz.status === QuizStatus.Draft" @click="controlQuiz(quiz.uid, 'start')">Start</button>
+        <button v-if="quiz.author === name && quiz.status === QuizStatus.Active" @click="controlQuiz(quiz.uid, 'end')">End</button>
+      </li>
+    </ul>
+  </div>
 </template>
 
 <style scoped></style>

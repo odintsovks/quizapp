@@ -27,13 +27,18 @@ const doLogin = async () => {
 
 <template>
   <form @submit.prevent="doLogin">
-    <table>
-      <tbody>
-        <tr><td>login</td><td><input v-model="login" placeholder="login" /></td></tr>
-        <tr><td>password</td><td><input v-model="password" type="password" placeholder="password" /></td></tr>
-        <tr><td colspan="2"><button type="submit">Login</button><button type="button" @click="goToRegister">Register</button></td></tr>
-      </tbody>
-    </table>
+    <div class="frame">
+      <h1 class="center">Login</h1>
+      <table>
+        <tbody>
+          <tr><td><h2>Username</h2></td></tr>
+          <tr><td><input v-model="login" placeholder="Username" /></td></tr>
+          <tr><td><h2>Password</h2></td></tr>
+          <tr><td><input v-model="password" type="password" placeholder="Password" /></td></tr>
+          <tr><td><button type="button" @click="goToRegister">Register</button><button type="submit">Login</button></td></tr>
+        </tbody>
+      </table>
+    </div>
     <p class="error" v-if="error !== ''">{{ error }}</p>
   </form>
 </template>

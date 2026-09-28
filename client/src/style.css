@@ -1,0 +1,132 @@
+:root {
+  --accent: #69d7ff;
+  --accent-hover: #2e6d86;
+  --border: #82afc1;
+  --error: #dc2626;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #1f2937;
+  background: #e8f6ff;
+  line-height: 1.5;
+}
+
+main {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+h1, h2 {
+  line-height: 1.2;
+  color: #2e6d86;
+}
+
+a {
+  color: var(--accent);
+}
+
+.frame {
+  background: #ffffff;
+  border-radius: 1rem;
+  padding: 1rem 0.9rem;
+  margin-bottom: 2rem;
+}
+
+.center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+input:not([type='radio']):not([type='checkbox']) {
+  padding: 0.4rem 0.6rem;
+  border: 3px solid var(--border);
+  border-radius: 0.5rem;
+  font: inherit;
+}
+
+textarea {
+  padding: 0.4rem 0.6rem;
+  border: 3px solid var(--border);
+  border-radius: 0.5rem;
+  font: inherit;
+}
+
+input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+button {
+  margin-left: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  border: 0px solid var(--border);
+  border-radius: 1rem;
+  background: #e8f6ff;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--accent-hover);
+  color: #ffffff;
+}
+
+button[type='submit'] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+button[type='submit']:hover {
+  background: var(--accent-hover);
+  color: #ffffff;
+}
+
+label {
+  display: block;
+  margin: 0.25rem 0;
+  cursor: pointer;
+}
+
+ul, ol {
+  line-height: 1.8;
+}
+
+li button {
+  padding: 0.15rem 0.6rem;
+  font-size: 0.875rem;
+}
+
+form table {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+
+form table td {
+  padding: 0.15rem 0 0.15rem 0;
+  vertical-align: middle;
+}
+
+form table td h2 {
+  display: flex;
+  line-height: 0;
+}
+
+.error {
+  color: var(--error);
+}
