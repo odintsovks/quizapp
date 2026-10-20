@@ -217,13 +217,16 @@
       </div>
       <button @click="(data.answer as TextEditAnswer).correctAnswers.push('Answer')">+</button>
     </div>
-    <button @click="saveQuestion">Save</button>
-    <div v-for="(page, i) in q.questions" :key="i">
-      <button @click="gotoQuestion(i)">{{ i + 1 }}</button>
-      <button @click="deleteQuestion(i)">x</button>
+    <div>
+      <button style="float: right;" @click="deleteQuestion(i)">x</button>
+      <button style="float: right;" v-for="(page, i) in q.questions" :key="i"
+        @click="gotoQuestion(q.questions.length - i - 1)">{{ q.questions.length - i }}</button>
     </div>
-    <button @click="addQuestion">New question</button>
-    <button @click="saveQuiz">Save quiz</button>
+    <div>
+      <button @click="saveQuestion">Save</button>
+      <button @click="addQuestion">New Question</button>
+      <button @click="saveQuiz">Save Quiz</button>
+    </div>
     <p v-if="savedUid !== null">Saved: <a :href="'/quiz/' + savedUid">{{ savedUid }}</a></p>
   </div>
 </template>
