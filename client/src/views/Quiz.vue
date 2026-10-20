@@ -152,51 +152,52 @@ onBeforeUnmount(() => {
 
 <template>
   <p class="error" v-if="error !== ''">{{ error }}</p>
-  <form v-if="joined === null" @submit.prevent="doJoin">
-    <h1>Join quiz</h1>
-    <input v-model="name" placeholder="Your name" />
-    <button type="submit">Join</button>
-  </form>
-  <div v-else>
-    <h1>{{ joined.title }}</h1>
-    <p>by {{ joined.author }}</p>
-    <p v-if="joined.participants.length > 0">participants: {{ joined.participants.join(', ') }}</p>
-    <div v-if="joined.isOrganizer">
-      <button v-if="joined.status === QuizStatus.Draft" @click="controlQuiz('start')">Start quiz</button>
-      <button v-if="joined.status === QuizStatus.Active" @click="controlQuiz('end')">End quiz</button>
-    </div>
-    <template v-if="result !== null">
-      <p>score: {{ result.score }} / {{ result.maxScore }}</p>
-      <ul>
-        <li v-for="(r, i) in result.questions" :key="i">
-          {{ r.question }} (weight {{ r.weight }}): {{ r.correct ? 'correct' : 'incorrect' }}
-        </li>
-      </ul>
-    </template>
-    <form v-else-if="joined.status === QuizStatus.Active" @submit.prevent="submit">
-      <div v-for="(q, qi) in joined.questions" :key="qi">
-        <p>{{ q.question }} (weight {{ q.weight }})</p>
-        <template v-if="q.kind === AnswerKind.Radio">
-          <label v-for="(o, i) in q.options ?? []" :key="i">
-            <input type="radio" :name="'question' + qi" :value="i" v-model="answers[qi]" /> {{ o }}
-          </label>
-        </template>
-        <template v-else-if="q.kind === AnswerKind.Checkbox">
-          <label v-for="(o, i) in q.options ?? []" :key="i">
-            <input type="checkbox" :value="i" v-model="answers[qi]" /> {{ o }}
-          </label>
-        </template>
-        <input v-else v-model="answers[qi]" />
-      </div>
-      <button type="submit">Submit</button>
+  <div class="frame">
+    <form v-if="joined === null" @submit.prevent="doJoin">
+      <h1>Join quiz</h1>
+      <input v-model="name" placeholder="Your name" />
+      <button type="submit">Join</button>
     </form>
-    <p v-else-if="joined.status === QuizStatus.Draft">The quiz has not started yet.</p>
-    <p v-else>The quiz has ended.</p>
-    <div v-if="leaderboard !== null && leaderboard.length > 0">
-      <h2>Leaderboard</h2>
-      <ol>
-        <li v-for="(e, i) in leaderboard" :key="i">{{ e.name }} — {{ e.score }} / {{ e.maxScore }}</li>
-      </ol>
+    <div v-else>
+      <h1>Quiz "{{ joined.title }}" by {{ joined.author }}</h1>
+      <p v-if="joined.participants.length > 0">Current participants: {{ joined.participants.join(', ') }}</p>
+      <div v-if="joined.isOrganizer">
+        <button v-if="joined.status === QuizStatus.Draft" @click="controlQuiz('start')">Start quiz</button>
+        <button v-if="joined.status === QuizStatus.Active" @click="controlQuiz('end')">End quiz</button>
+      </div>
+      <template v-if="result !== null">
+        <p>score: {{ result.score }} / {{ result.maxScore }}</p>
+        <ul>
+          <li v-for="(r, i) in result.questions" :key="i">
+            {{ r.question }} (weight {{ r.weight }}): {{ r.correct ? 'correct' : 'incorrect' }}
+          </li>
+        </ul>
+      </template>
+      <form v-else-if="joined.status === QuizStatus.Active" @submit.prevent="submit">
+        <div v-for="(q, qi) in joined.questions" :key="qi">
+          <p>{{ q.question }} (weight {{ q.weight }})</p>
+          <template v-if="q.kind === AnswerKind.Radio">
+            <label v-for="(o, i) in q.options ?? []" :key="i">
+              <input type="radio" :name="'question' + qi" :value="i" v-model="answers[qi]" /> {{ o }}
+            </label>
+          </template>
+          <template v-else-if="q.kind === AnswerKind.Checkbox">
+            <label v-for="(o, i) in q.options ?? []" :key="i">
+              <input type="checkbox" :value="i" v-model="answers[qi]" /> {{ o }}
+            </label>
+          </template>
+          <input v-else v-model="answers[qi]" />
+        </div>
+        <button type="submit">Submit</button>
+      </form>
+      <p v-else-if="joined.status === QuizStatus.Draft">The quiz has not started yet.</p>
+      <p v-else>The quiz has ended.</p>
+      <div v-if="leaderboard !== null && leaderboard.length > 0">
+        <h2>Leaderboard</h2>
+        <ol>
+          <li v-for="(e, i) in leaderboard" :key="i">{{ e.name }} — {{ e.score }} / {{ e.maxScore }}</li>
+        </ol>
+      </div>
     </div>
   </div>
 </template>
