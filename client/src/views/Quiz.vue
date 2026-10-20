@@ -160,10 +160,12 @@ onBeforeUnmount(() => {
     </form>
     <div v-else>
       <h1>Quiz "{{ joined.title }}" by {{ joined.author }}</h1>
-      <p v-if="joined.participants.length > 0">Current participants: {{ joined.participants.join(', ') }}</p>
+      <p v-if="joined.participants.length > 0" style="text-align: right;">Current participants:<br> {{ joined.participants.join(', ') }}</p>
       <div v-if="joined.isOrganizer">
-        <button v-if="joined.status === QuizStatus.Draft" @click="controlQuiz('start')">Start quiz</button>
-        <button v-if="joined.status === QuizStatus.Active" @click="controlQuiz('end')">End quiz</button>
+        <button v-if="joined.status === QuizStatus.Draft" @click="controlQuiz('start')"
+          style="float: right;">Start Quiz</button>
+        <button v-if="joined.status === QuizStatus.Active" @click="controlQuiz('end')" style="float:
+          right;">End Quiz</button>
       </div>
       <template v-if="result !== null">
         <p>score: {{ result.score }} / {{ result.maxScore }}</p>
