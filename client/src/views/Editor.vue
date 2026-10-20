@@ -225,7 +225,7 @@
     <div>
       <button @click="saveQuestion">Save</button>
       <button @click="addQuestion">New Question</button>
-      <button @click="saveQuiz">Save Quiz</button>
+      <button @click="saveQuiz">Finish</button>
     </div>
     <p v-if="savedUid !== null">Saved: <a :href="'/quiz/' + savedUid">{{ savedUid }}</a></p>
   </div>
