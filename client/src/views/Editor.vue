@@ -63,6 +63,12 @@
   const author = ref('');
   const error = ref('');
   const savedUid = ref<string | null>(null);
+  const durationMin = ref<number | null>(null);
+
+  const setDurationMin = (event: Event) => {
+    const v = (event.target as HTMLInputElement).valueAsNumber;
+    durationMin.value = Number.isNaN(v) ? null : v;
+  };
 
   const loadAuthor = async () => {
     try {
@@ -192,7 +198,11 @@
     }
     saveQuestion();
     try {
-      const res: { uid: string } = await api<{ uid: string }>('/quiz', 'POST', { title: q.value.title, questions: q.value.questions });
+      const payload: Record<string, unknown> = { title: q.value.title, questions: q.value.questions };
+      if (durationMin.value !== null && durationMin.value > 0) {
+        payload.durationSec = Math.round(durationMin.value * 60);
+      }
+      const res: { uid: string } = await api<{ uid: string }>('/quiz', 'POST', payload);
       savedUid.value = res.uid;
     } catch (err) {
       error.value = (err as Error).message;
@@ -205,6 +215,8 @@
 <template>
   <p class="error" v-if="error !== ''">{{ error }}</p>
   <input v-model="q.title" placeholder="Title"/>
+  <input type="number" min="1" :value="durationMin ?? ''" @input="setDurationMin"
+    placeholder="Auto-end after (minutes, optional)" style="margin-top: 0.5rem;"/>
   <div class="frame" style="display: flex; flex-direction: column;">
     <h2 style="line-height: 0">Contents</h2>
     <textarea v-model="data.question" placeholder="Question text" style="flex: 2; flex-basis: 150px;"/>

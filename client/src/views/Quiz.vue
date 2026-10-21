@@ -38,6 +38,8 @@ interface JoinedQuiz {
   questions: QuizQuestion[];
   participants: string[];
   isOrganizer: boolean;
+  durationSec?: number | null;
+  endsAt?: string | null;
 }
 
 interface ScoreResult {
@@ -62,8 +64,27 @@ const joined = ref<JoinedQuiz | null>(null)
 const answers = ref<(number | null | number[] | string)[]>([])
 const result = ref<ScoreResult | null>(null)
 const leaderboard = ref<LeaderboardEntry[] | null>(null)
+const timeLeft = ref(0)
 
 let ws: WebSocket | null = null
+let countdownTimer: number | undefined
+
+const stopCountdown = () => {
+  if (countdownTimer !== undefined) {
+    window.clearInterval(countdownTimer)
+    countdownTimer = undefined
+  }
+}
+
+const startCountdown = (endsAt: string) => {
+  const tick = () => {
+    timeLeft.value = Math.max(0, Math.round((Date.parse(endsAt) - Date.now()) / 1000))
+  }
+  tick()
+  countdownTimer = window.setInterval(tick, 1000)
+}
+
+const formatTimeLeft = (total: number) => `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
 
 const handleMessage = (msg: WsMessage) => {
   switch (msg.type) {
@@ -72,12 +93,14 @@ const handleMessage = (msg: WsMessage) => {
       joined.value = quiz
       answers.value = quiz.questions.map(q => q.kind === AnswerKind.Checkbox ? [] : q.kind === AnswerKind.TextEdit ? '' : null)
       if (quiz.leaderboard !== undefined) leaderboard.value = quiz.leaderboard
+      if (quiz.endsAt !== undefined && quiz.endsAt !== null) startCountdown(quiz.endsAt)
       error.value = ''
       break
     }
     case 'quiz-status': {
       if (joined.value !== null) {
         joined.value.status = msg.status as QuizStatus
+        if (msg.status === QuizStatus.Finished) stopCountdown()
       }
       break
     }
@@ -156,6 +179,7 @@ const controlQuiz = async (action: string) => {
 }
 
 onBeforeUnmount(() => {
+  stopCountdown()
   ws?.close()
 })
 </script>
@@ -170,7 +194,10 @@ onBeforeUnmount(() => {
     </form>
     <div v-else>
       <h1>Quiz "{{ joined.title }}" by {{ joined.author }}</h1>
-      <p v-if="joined.participants.length > 0" style="text-align: right;">Current participants:<br> {{ joined.participants.join(', ') }}</p>
+      <div v-if="joined.participants.length > 0 || (joined.endsAt !== undefined && joined.endsAt !== null && joined.status === QuizStatus.Active)" style="display: flex;">
+        <span v-if="joined.endsAt !== undefined && joined.endsAt !== null && joined.status === QuizStatus.Active">Time left: {{ formatTimeLeft(timeLeft) }}</span>
+        <span v-if="joined.participants.length > 0" style="margin-left: auto;">Current participants: {{ joined.participants.join(', ') }}</span>
+      </div>
       <div v-if="joined.isOrganizer">
         <button v-if="joined.status === QuizStatus.Draft" @click="controlQuiz('start')"
           style="float: right;">Start Quiz</button>
