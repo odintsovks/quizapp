@@ -49,10 +49,14 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(v => typeof v === "string");
 }
 
+// the whole quiz (including pictures as data URLs) is one JSON document, so cap image size
+const MAX_IMAGE_LENGTH = 5 * 1024 * 1024;
+
 function isValidQuestion(value: unknown): value is QuizQuestion {
   if (typeof value !== "object" || value === null) return false;
   const q = value as Record<string, unknown>;
   if (typeof q.weight !== "number" || typeof q.question !== "string") return false;
+  if (q.image !== undefined && (typeof q.image !== "string" || !q.image.startsWith("data:image/") || q.image.length > MAX_IMAGE_LENGTH)) return false;
   const answer = q.answer as Record<string, unknown> | null;
   if (answer === null || typeof answer !== "object") return false;
   switch (q.kind) {

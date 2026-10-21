@@ -24,6 +24,7 @@
   interface QuizQuestion {
     weight: number;
     question: string;
+    image?: string;
     kind: AnswerKind;
     answer: RadioAnswer | CheckboxAnswer | TextEditAnswer;
   }
@@ -46,6 +47,7 @@
   interface QuestionData {
     weight: number | null;
     question: string | null;
+    image: string | null;
     kind: AnswerKind | null;
     answer: RadioAnswer | CheckboxAnswer | TextEditAnswer | null;
   };
@@ -53,6 +55,7 @@
   const data = ref<QuestionData>({
     weight: null,
     question: null,
+    image: null,
     kind: null,
     answer: null,
   });
@@ -75,12 +78,26 @@
     data.value.weight = Number.isNaN(v) ? null : v;
   };
 
+  const loadImage = (event: Event) => {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (file === undefined || file === null) return;
+    if (file.size > 3 * 1024 * 1024) {
+      error.value = 'picture is too large (max 3 MB)';
+      return;
+    }
+    error.value = '';
+    const reader = new FileReader();
+    reader.onload = () => { data.value.image = typeof reader.result === "string" ? reader.result : null; };
+    reader.readAsDataURL(file);
+  };
+
   const saveQuestion = () => {
     if (data.value.weight === null || data.value.question === null || data.value.question === '' || data.value.kind === null || data.value.answer === null)
       return;
     q.value.questions[currentQuestionIndex] = {
       weight: data.value.weight,
       question: data.value.question,
+      image: data.value.image ?? undefined,
       kind: data.value.kind,
       answer: data.value.answer
     }
@@ -89,6 +106,7 @@
   const gotoQuestion = (index: number) => {
     data.value.weight = q.value.questions.at(index)?.weight ?? null;
     data.value.question = q.value.questions.at(index)?.question ?? null;
+    data.value.image = q.value.questions.at(index)?.image ?? null;
     data.value.kind = q.value.questions.at(index)?.kind ?? null;
     data.value.answer = q.value.questions.at(index)?.answer ?? null;
     currentQuestionIndex = index;
@@ -98,6 +116,7 @@
     saveQuestion();
     data.value.weight = null;
     data.value.question = null;
+    data.value.image = null;
     data.value.kind = null;
     data.value.answer = null;
     currentQuestionIndex = q.value.questions.length
@@ -111,6 +130,7 @@
       currentQuestionIndex = 0;
       data.value.weight = null;
       data.value.question = null;
+      data.value.image = null;
       data.value.kind = null;
       data.value.answer = null;
     } else if (index <= currentQuestionIndex) {
@@ -189,6 +209,11 @@
     <h2 style="line-height: 0">Contents</h2>
     <textarea v-model="data.question" placeholder="Question text" style="flex: 2; flex-basis: 150px;"/>
     <div>
+      <input type="file" accept="image/*" @change="loadImage" />
+      <button v-if="data.image !== null" @click="data.image = null">Remove picture</button>
+    </div>
+    <img v-if="data.image !== null" :src="data.image" style="max-width: 100%; border-radius: 0.5rem;" />
+    <div>
       <button @click="setQuestionKind(AnswerKind.Radio)">Radio</button>
       <button @click="setQuestionKind(AnswerKind.Checkbox)">CheckBox</button>
       <button @click="setQuestionKind(AnswerKind.TextEdit)">TextEdit</button>
@@ -218,7 +243,7 @@
       <button @click="(data.answer as TextEditAnswer).correctAnswers.push('Answer')">+</button>
     </div>
     <div>
-      <button style="float: right;" @click="deleteQuestion(i)">x</button>
+      <button style="float: right;" @click="deleteQuestion(currentQuestionIndex)">x</button>
       <button style="float: right;" v-for="(page, i) in q.questions" :key="i"
         @click="gotoQuestion(q.questions.length - i - 1)">{{ q.questions.length - i }}</button>
     </div>

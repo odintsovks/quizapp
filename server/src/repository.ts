@@ -32,6 +32,7 @@ export interface TextEditAnswer {
 export interface QuizQuestion {
   weight: number;
   question: string;
+  image?: string; // optional data URL of a picture attached to the question text
   kind: AnswerKind;
   answer: RadioAnswer | CheckboxAnswer | TextEditAnswer;
 }
@@ -217,13 +218,13 @@ export function stripAnswers(questions: QuizQuestion[]): Object[] {
   for (const q of questions) {
     switch (q.kind) {
       case AnswerKind.Radio:
-        result.push({ question: q.question, weight: q.weight, kind: q.kind, options: (q.answer as RadioAnswer).options })
+        result.push({ question: q.question, image: q.image, weight: q.weight, kind: q.kind, options: (q.answer as RadioAnswer).options })
         break;
       case AnswerKind.Checkbox:
-        result.push({ question: q.question, weight: q.weight, kind: q.kind, options: (q.answer as CheckboxAnswer).options })
+        result.push({ question: q.question, image: q.image, weight: q.weight, kind: q.kind, options: (q.answer as CheckboxAnswer).options })
         break;
       case AnswerKind.TextEdit:
-        result.push({ question: q.question, weight: q.weight, kind: q.kind })
+        result.push({ question: q.question, image: q.image, weight: q.weight, kind: q.kind })
         break;
     }
   }

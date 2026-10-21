@@ -18,6 +18,7 @@ enum QuizStatus {
 
 interface QuizQuestion {
   question: string;
+  image?: string;
   weight: number;
   kind: AnswerKind;
   options?: string[];
@@ -177,6 +178,7 @@ onBeforeUnmount(() => {
       </template>
       <form v-else-if="joined.status === QuizStatus.Active" @submit.prevent="submit">
         <div v-for="(q, qi) in joined.questions" :key="qi">
+          <img v-if="q.image !== undefined" :src="q.image" style="max-width: 100%; border-radius: 0.5rem;" />
           <p>{{ q.question }} (weight {{ q.weight }})</p>
           <template v-if="q.kind === AnswerKind.Radio">
             <label v-for="(o, i) in q.options ?? []" :key="i">
