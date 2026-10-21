@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { api, getSession } from '../api'
 import { connectWebSocket, sendWs, type WsMessage } from '../ws'
@@ -132,6 +132,15 @@ const doJoin = () => {
   error.value = ''
   connect()
 }
+
+// prefill the join name with the account name so results are tied to it
+onMounted(async () => {
+  if (getSession() === null) return
+  try {
+    const res: { name: string } = await api<{ name: string }>('/me')
+    name.value = res.name
+  } catch {} // stale session, the join form will ask for a name
+})
 
 const submit = () => {
   if (ws !== null) sendWs(ws, { type: 'answer', answers: answers.value })
