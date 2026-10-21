@@ -64,6 +64,14 @@ export interface LeaderboardEntry {
   maxScore: number;
 }
 
+export interface HistoryEntry {
+  quizUid: string;
+  title: string;
+  score: number;
+  maxScore: number;
+  createdAt: string;
+}
+
 export interface Repository {
   fetchUser(name: string): User | null;
   uploadUser(user: User): void;
@@ -76,6 +84,7 @@ export interface Repository {
   saveResult(quizUid: string, name: string, score: number, maxScore: number): void;
   fetchResults(quizUid: string): QuizResult[];
   fetchLeaderboard(quizUid: string): LeaderboardEntry[];
+  fetchHistory(name: string): HistoryEntry[];
 }
 
 function quizFromRow(row: Record<string, unknown>): Quiz {
@@ -179,6 +188,14 @@ class SqliteRepository implements Repository {
   fetchResults(quizUid: string): QuizResult[] {
     const rows = this.db.prepare("SELECT name, score, max_score AS maxScore, created_at AS createdAt FROM results WHERE quiz_uid = ? ORDER BY rowid").all(quizUid) as Record<string, unknown>[];
     return rows.map(row => ({ name: row.name as string, score: row.score as number, maxScore: row.maxScore as number, createdAt: row.createdAt as string }));
+  }
+
+  // all results saved under this name, newest first
+  fetchHistory(name: string): HistoryEntry[] {
+    const rows = this.db.prepare(
+      "SELECT r.quiz_uid AS quizUid, q.title, r.score, r.max_score AS maxScore, r.created_at AS createdAt FROM results r JOIN quizzes q ON q.uid = r.quiz_uid WHERE r.name = ? ORDER BY r.rowid DESC"
+    ).all(name) as Record<string, unknown>[];
+    return rows.map(row => ({ quizUid: row.quizUid as string, title: row.title as string, score: row.score as number, maxScore: row.maxScore as number, createdAt: row.createdAt as string }));
   }
 
   // best score per participant, ranked by score descending

@@ -181,6 +181,17 @@ addHandler("/quizzes", "GET", (_req: http.IncomingMessage, _url: URL, res: http.
   res.end(JSON.stringify(quizzes));
 });
 
+addHandler("/history", "GET", (req: http.IncomingMessage, _url: URL, res: http.ServerResponse) => {
+  const user: User | null = fetchUserBySessionHeader(req);
+  if (user === null) {
+    res.writeHead(401, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "authentication required" }));
+    return;
+  }
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(repository.fetchHistory(user.name)));
+});
+
 addHandler("/me", "GET", (req: http.IncomingMessage, _url: URL, res: http.ServerResponse) => {
   const user: User | null = fetchUserBySessionHeader(req);
   if (user === null) {
