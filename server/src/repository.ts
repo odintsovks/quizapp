@@ -49,6 +49,8 @@ export interface Quiz {
   title: string;
   status: QuizStatus;
   questions: QuizQuestion[];
+  durationSec?: number; // if set, the quiz auto-ends this many seconds after being started
+  endsAt?: string; // ISO time at which an active quiz with a duration is auto-ended
 }
 
 export interface QuizResult {
@@ -85,16 +87,20 @@ export interface Repository {
   fetchResults(quizUid: string): QuizResult[];
   fetchLeaderboard(quizUid: string): LeaderboardEntry[];
   fetchHistory(name: string): HistoryEntry[];
+  fetchDueQuizzes(nowIso: string): Quiz[];
 }
 
 function quizFromRow(row: Record<string, unknown>): Quiz {
-  return {
+  const quiz: Quiz = {
     uid: row.uid as string,
     author: row.author as string,
     title: row.title as string,
     status: row.status as QuizStatus,
     questions: JSON.parse(row.questions_json as string) as QuizQuestion[],
   };
+  if (row.duration_sec != null) quiz.durationSec = row.duration_sec as number;
+  if (row.ends_at != null) quiz.endsAt = row.ends_at as string;
+  return quiz;
 }
 
 class SqliteRepository implements Repository {
@@ -129,6 +135,14 @@ class SqliteRepository implements Repository {
         created_at TEXT NOT NULL
       );
     `);
+    // the quizzes table predates auto-ending; add the columns to existing databases
+    const columns = this.db.prepare("PRAGMA table_info(quizzes)").all() as { name: string }[];
+    if (!columns.some(c => c.name === "duration_sec")) {
+      this.db.exec("ALTER TABLE quizzes ADD COLUMN duration_sec INTEGER");
+    }
+    if (!columns.some(c => c.name === "ends_at")) {
+      this.db.exec("ALTER TABLE quizzes ADD COLUMN ends_at TEXT");
+    }
   }
 
   fetchUser(name: string): User | null {
@@ -158,7 +172,7 @@ class SqliteRepository implements Repository {
   }
 
   fetchQuiz(uid: string): Quiz | null {
-    const row = this.db.prepare("SELECT uid, author, title, status, questions_json FROM quizzes WHERE uid = ?").get(uid) as Record<string, unknown> | undefined;
+    const row = this.db.prepare("SELECT uid, author, title, status, questions_json, duration_sec, ends_at FROM quizzes WHERE uid = ?").get(uid) as Record<string, unknown> | undefined;
     return row === undefined ? null : quizFromRow(row);
   }
 
@@ -171,8 +185,8 @@ class SqliteRepository implements Repository {
   }
 
   private storeQuiz(quiz: Quiz): void {
-    this.db.prepare("INSERT OR REPLACE INTO quizzes (uid, author, title, status, questions_json) VALUES (?, ?, ?, ?, ?)")
-      .run(quiz.uid, quiz.author, quiz.title, quiz.status, JSON.stringify(quiz.questions));
+    this.db.prepare("INSERT OR REPLACE INTO quizzes (uid, author, title, status, questions_json, duration_sec, ends_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run(quiz.uid, quiz.author, quiz.title, quiz.status, JSON.stringify(quiz.questions), quiz.durationSec ?? null, quiz.endsAt ?? null);
   }
 
   listQuizzes(): Quiz[] {
@@ -196,6 +210,14 @@ class SqliteRepository implements Repository {
       "SELECT r.quiz_uid AS quizUid, q.title, r.score, r.max_score AS maxScore, r.created_at AS createdAt FROM results r JOIN quizzes q ON q.uid = r.quiz_uid WHERE r.name = ? ORDER BY r.rowid DESC"
     ).all(name) as Record<string, unknown>[];
     return rows.map(row => ({ quizUid: row.quizUid as string, title: row.title as string, score: row.score as number, maxScore: row.maxScore as number, createdAt: row.createdAt as string }));
+  }
+
+  // active quizzes whose auto-end time has passed
+  fetchDueQuizzes(nowIso: string): Quiz[] {
+    const rows = this.db.prepare(
+      `SELECT uid, author, title, status, questions_json, duration_sec, ends_at FROM quizzes WHERE status = ${QuizStatus.Active} AND ends_at IS NOT NULL AND ends_at <= ?`
+    ).all(nowIso) as Record<string, unknown>[];
+    return rows.map(quizFromRow);
   }
 
   // best score per participant, ranked by score descending

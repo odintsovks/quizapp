@@ -109,6 +109,11 @@ addHandler("/quiz", "POST", (req: http.IncomingMessage, url: URL, res: http.Serv
       res.end(JSON.stringify({ error: "invalid quiz payload" }));
       return;
     }
+    if (body.durationSec !== undefined && (!Number.isInteger(body.durationSec) || body.durationSec <= 0)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "durationSec must be a positive number of seconds" }));
+      return;
+    }
     const quiz: Quiz = {
       uid: crypto.randomBytes(16).toString("hex"),
       author: user.name,
@@ -116,6 +121,7 @@ addHandler("/quiz", "POST", (req: http.IncomingMessage, url: URL, res: http.Serv
       status: QuizStatus.Draft,
       questions: body.questions as QuizQuestion[],
     };
+    if (typeof body.durationSec === "number") quiz.durationSec = body.durationSec;
     repository.uploadQuiz(quiz);
     res.writeHead(201, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ uid: quiz.uid }));
@@ -145,15 +151,46 @@ function handleQuizControl(url: URL, user: User, from: QuizStatus, to: QuizStatu
     res.end(JSON.stringify({ error: `quiz is not ${QuizStatus[from].toLowerCase()}` }));
     return;
   }
-  quiz.status = to;
-  repository.updateQuiz(quiz);
-  announceQuizStatus(id, to);
   if (to === QuizStatus.Finished) {
-    announceLeaderboard(id);
+    finishQuiz(quiz);
+  } else {
+    // starting a timed quiz: remember when it should end on its own
+    if (quiz.durationSec !== undefined && quiz.durationSec > 0) {
+      quiz.endsAt = new Date(Date.now() + quiz.durationSec * 1000).toISOString();
+      const delay = Date.parse(quiz.endsAt) - Date.now();
+      if (delay > 0) setTimeout(() => autoFinishQuiz(id), delay);
+    }
+    quiz.status = to;
+    repository.updateQuiz(quiz);
+    announceQuizStatus(id, to);
   }
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ status: quiz.status }));
 }
+
+// shared by manual ending and the timer: persist, then tell every participant in the room
+function finishQuiz(quiz: Quiz): void {
+  quiz.status = QuizStatus.Finished;
+  repository.updateQuiz(quiz);
+  announceQuizStatus(quiz.uid, QuizStatus.Finished);
+  announceLeaderboard(quiz.uid);
+}
+
+function autoFinishQuiz(quizUid: string): void {
+  const quiz: Quiz | null = repository.fetchQuiz(quizUid);
+  if (quiz === null || quiz.status !== QuizStatus.Active) return;
+  finishQuiz(quiz);
+}
+
+// safety net for timers lost to a server restart; idempotent with the setTimeout above
+function finishDueQuizzes(): void {
+  for (const quiz of repository.fetchDueQuizzes(new Date().toISOString())) {
+    autoFinishQuiz(quiz.uid);
+  }
+}
+
+setInterval(finishDueQuizzes, 10_000).unref();
+finishDueQuizzes(); // catch up on startup, e.g. if the server restarted mid-quiz
 
 addHandler("/quiz/start", "POST", (req: http.IncomingMessage, url: URL, res: http.ServerResponse) => {
   const user: User | null = fetchUserBySessionHeader(req);

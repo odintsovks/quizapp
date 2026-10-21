@@ -40,7 +40,7 @@ export function broadcastToQuiz(quizId: string, message: unknown, except?: WebSo
 }
 
 function publicQuiz(quiz: Quiz): Object {
-  return { quizId: quiz.uid, author: quiz.author, title: quiz.title, status: quiz.status, questions: stripAnswers(quiz.questions) };
+  return { quizId: quiz.uid, author: quiz.author, title: quiz.title, status: quiz.status, questions: stripAnswers(quiz.questions), durationSec: quiz.durationSec ?? null, endsAt: quiz.endsAt ?? null };
 }
 
 function handleJoin(ws: WebSocket, state: ClientState, msg: any): void {
